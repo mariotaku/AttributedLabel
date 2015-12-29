@@ -48,24 +48,36 @@ public class AttributedLabel: UIView {
     }
     
     /// default is `0`.
-    public var numberOfLines: Int = 0 {
-        didSet { setNeedsDisplay() }
+    public var numberOfLines: Int {
+        get { return container.maximumNumberOfLines }
+        set {
+            container.maximumNumberOfLines = newValue
+            setNeedsDisplay()
+        }
     }
     /// default is `Left`.
     public var contentAlignment: ContentAlignment = .Left {
         didSet { setNeedsDisplay() }
     }
     /// `lineFragmentPadding` of `NSTextContainer`. default is `0`.
-    public var padding: CGFloat = 0 {
-        didSet { setNeedsDisplay() }
+    public var padding: CGFloat {
+        get { return container.lineFragmentPadding }
+        set {
+            container.lineFragmentPadding = newValue
+            setNeedsDisplay()
+        }
     }
     /// default is system font 17 plain.
     public var font = UIFont.systemFontOfSize(17) {
         didSet { setNeedsDisplay() }
     }
     /// default is `ByTruncatingTail`.
-    public var lineBreakMode: NSLineBreakMode = .ByTruncatingTail {
-        didSet { setNeedsDisplay() }
+    public var lineBreakMode: NSLineBreakMode {
+        get { return container.lineBreakMode }
+        set {
+            container.lineBreakMode = newValue
+            setNeedsDisplay()
+        }
     }
     /// default is nil (text draws black).
     public var textColor: UIColor? {
@@ -97,18 +109,24 @@ public class AttributedLabel: UIView {
         }
     }
     
-    private var mergedAttributedText: NSAttributedString? {
+    var mergedAttributedText: NSAttributedString? {
         if let attributedText = attributedText {
             return mergeAttributes(attributedText)
         }
         return nil
     }
     
+    let container = NSTextContainer()
+    let layoutManager = NSLayoutManager()
+    
     public override init(frame: CGRect) {
         super.init(frame: frame)
         
         opaque = false
         contentMode = .Redraw
+        lineBreakMode = .ByTruncatingTail
+        padding = 0
+        layoutManager.addTextContainer(container)
     }
     
     public required init?(coder aDecoder: NSCoder) {
@@ -116,6 +134,9 @@ public class AttributedLabel: UIView {
         
         opaque = false
         contentMode = .Redraw
+        lineBreakMode = .ByTruncatingTail
+        padding = 0
+        layoutManager.addTextContainer(container)
     }
     
     public override func setNeedsDisplay() {
@@ -128,19 +149,17 @@ public class AttributedLabel: UIView {
         guard let attributedText = mergedAttributedText else {
             return
         }
-
-        let container = textContainer(rect.size)
-        let manager = layoutManager(container)
         
         let storage = NSTextStorage(attributedString: attributedText)
-        storage.addLayoutManager(manager)
+        storage.addLayoutManager(layoutManager)
         
-        let frame = manager.usedRectForTextContainer(container)
+        container.size = rect.size
+        let frame = layoutManager.usedRectForTextContainer(container)
         let point = contentAlignment.alignOffset(viewSize: rect.size, containerSize: CGRectIntegral(frame).size)
         
-        let glyphRange = manager.glyphRangeForTextContainer(container)
-        manager.drawBackgroundForGlyphRange(glyphRange, atPoint: point)
-        manager.drawGlyphsForGlyphRange(glyphRange, atPoint: point)
+        let glyphRange = layoutManager.glyphRangeForTextContainer(container)
+        layoutManager.drawBackgroundForGlyphRange(glyphRange, atPoint: point)
+        layoutManager.drawGlyphsForGlyphRange(glyphRange, atPoint: point)
     }
     
     public override func sizeThatFits(size: CGSize) -> CGSize {
@@ -148,13 +167,11 @@ public class AttributedLabel: UIView {
             return super.sizeThatFits(size)
         }
         
-        let container = textContainer(size)
-        let manager = layoutManager(container)
-        
         let storage = NSTextStorage(attributedString: attributedText)
-        storage.addLayoutManager(manager)
+        storage.addLayoutManager(layoutManager)
         
-        let frame = manager.usedRectForTextContainer(container)
+        container.size = size
+        let frame = layoutManager.usedRectForTextContainer(container)
         return CGRectIntegral(frame).size
     }
     
@@ -162,20 +179,6 @@ public class AttributedLabel: UIView {
         super.sizeToFit()
         
         frame.size = sizeThatFits(CGSize(width: bounds.width, height: CGFloat.max))
-    }
-    
-    private func textContainer(size: CGSize) -> NSTextContainer {
-        let container = NSTextContainer(size: size)
-        container.lineBreakMode = lineBreakMode
-        container.lineFragmentPadding = padding
-        container.maximumNumberOfLines = numberOfLines
-        return container
-    }
-    
-    private func layoutManager(container: NSTextContainer) -> NSLayoutManager {
-        let layoutManager = NSLayoutManager()
-        layoutManager.addTextContainer(container)
-        return layoutManager
     }
     
     private func mergeAttributes(attributedText: NSAttributedString) -> NSAttributedString {
